@@ -7,12 +7,16 @@ SRC_URI = "file://init-readonly-rootfs-overlay-boot.sh"
 S = "${WORKDIR}"
 
 do_install() {
-        install -m 0755 ${WORKDIR}/init-readonly-rootfs-overlay-boot.sh ${D}/init
+        install -m 0755 ${WORKDIR}/init-readonly-rootfs-overlay-boot.sh ${D}/init-ro
         install -d "${D}/media/rfs/ro"
         install -d "${D}/media/rfs/rw"
+
+	# Remove /sbin/init and replace link
+	install -d ${D}${base_sbindir}
+	ln -s /init-ro ${D}/sbin/init
 }
 
-FILES_${PN} += " /init /media/rfs"
+FILES_${PN} += " /init-ro /media/rfs /sbin/init"
 
 # Due to kernel dependency
 PACKAGE_ARCH = "${MACHINE_ARCH}"
