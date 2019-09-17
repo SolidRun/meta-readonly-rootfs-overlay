@@ -8,7 +8,7 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin
 MOUNT="/bin/mount"
 UMOUNT="/bin/umount"
 
-INIT="/sbin/init"
+INIT="/lib/systemd/systemd"
 ROOT_ROINIT="/sbin/init"
 
 ROOT_MOUNT="/mnt"
@@ -24,7 +24,7 @@ ROOT_ROMOUNTOPTIONS_DEVICE="noatime,nodiratime"
 
 ROOT_RWFSTYPE=""
 ROOT_RWMOUNTOPTIONS="rw,noatime,mode=755 tmpfs"
-ROOT_RWMOUNTOPTIONS_DEVICE="rw,noatime,mode=755"
+ROOT_RWMOUNTOPTIONS_DEVICE="rw,noatime"
 
 early_setup() {
 	mkdir -p /proc
@@ -32,6 +32,25 @@ early_setup() {
 	$MOUNT -t proc proc /proc
 	$MOUNT -t sysfs sysfs /sys
 	grep -w "/dev" /proc/mounts >/dev/null || $MOUNT -t devtmpfs none /dev
+}
+
+find_root_rodevice() {
+	arg=${*}
+	optarg=$(expr "x$arg" : 'x[^=]*=\(.*\)' || echo '')
+	case $arg in
+		LABEL=*)
+			device="$(basename "$(readlink /dev/disk/by-label/"$optarg")")"
+			echo "/dev/$device"
+			;;
+		PARTUUID=*)
+			device="$(basename "$(readlink /dev/disk/by-partuuid/"$optarg")")"
+			echo "/dev/$device"
+			;;
+		UUID=*)
+			device="$(basename "$(readlink /dev/disk/by-uuid/"$optarg")")"
+			echo "/dev/$device"
+			;;
+	esac
 }
 
 read_args() {
@@ -62,7 +81,7 @@ read_args() {
 			rootrwoptions=*)
 				ROOT_RWMOUNTOPTIONS_DEVICE="$optarg" ;;
 			init=*)
-			INIT=$optarg ;;
+				INIT=$optarg ;;
 		esac
 	done
 }
@@ -101,10 +120,10 @@ mount_and_boot() {
 
 	# Mount root file system to new mount-point, if unsuccessful, try bind
 	# mounting current root file system.
-	if ! $MOUNT "$ROOT_ROMOUNTPARAMS" "$ROOT_ROMOUNT" 2>/dev/null && \
+	if ! $MOUNT $ROOT_ROMOUNTPARAMS $ROOT_ROMOUNT 2>/dev/null && \
 		[ "x$ROOT_ROMOUNTPARAMS_BIND" = "x$ROOT_ROMOUNTPARAMS" ] || \
 		log "Could not mount $ROOT_RODEVICE, bind mounting..." && \
-		! $MOUNT "$ROOT_ROMOUNTPARAMS_BIND" "$ROOT_ROMOUNT"; then
+		! $MOUNT $ROOT_ROMOUNTPARAMS_BIND $ROOT_ROMOUNT; then
 		fatal "Could not mount read-only rootfs"
 	fi
 
@@ -133,7 +152,7 @@ mount_and_boot() {
 	fi
 
 	# Mount read-write file system into initram root file system
-	if ! $MOUNT "$ROOT_RWMOUNTPARAMS" "$ROOT_RWMOUNT" ; then
+	if ! $MOUNT $ROOT_RWMOUNTPARAMS $ROOT_RWMOUNT ; then
 		fatal "Could not mount read-write rootfs"
 	fi
 
@@ -176,11 +195,11 @@ mount_and_boot() {
 	# Move read-only and read-write root file system into the overlay
 	# file system
 	mkdir -p $ROOT_MOUNT/$ROOT_ROMOUNT $ROOT_MOUNT/$ROOT_RWMOUNT
-	$MOUNT -n --move $ROOT_ROMOUNT ${ROOT_MOUNT}/$ROOT_ROMOUNT
-	$MOUNT -n --move $ROOT_RWMOUNT ${ROOT_MOUNT}/$ROOT_RWMOUNT
+	$MOUNT -n --move $ROOT_ROMOUNT ${ROOT_MOUNT}$ROOT_ROMOUNT
+	$MOUNT -n --move $ROOT_RWMOUNT ${ROOT_MOUNT}$ROOT_RWMOUNT
 
 	# switch to actual init in the overlay root file system
-	exec switch_root "$ROOT_MOUNT $INIT" ||
+	exec switch_root $ROOT_MOUNT $INIT ||
 		fatal "Couldn't chroot, dropping to shell"
 }
 
