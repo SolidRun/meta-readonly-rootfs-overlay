@@ -6,6 +6,7 @@ set -euo pipefail
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 
 MOUNT="/bin/mount"
+FSCK="/sbin/fsck"
 GREP="/bin/grep"
 MKDIR="/bin/mkdir"
 EXPR="/usr/bin/expr"
@@ -68,23 +69,25 @@ check_etc_hostname() {
 	hostname_file="${ROOT_MOUNT}/etc/hostname"
 	kernel_hostname_file="/proc/sys/kernel/hostname"
 
-	for entry in ${mmc_output}
-	do
-		export "${entry?}"
-	done
+	if [ -n "${mmc_output}" ] ; then
+		for entry in ${mmc_output}
+		do
+			export "${entry?}"
+		done
 
-	if [ -f ${hostname_file} ]
-	then
-		if ! ${GREP} -q "${SERIAL}" ${hostname_file}
+		if [ -f ${hostname_file} ]
 		then
-			${ECHO} "${SERIAL}" > ${hostname_file}
+			if ! ${GREP} -q "${SERIAL}" ${hostname_file}
+			then
+				${ECHO} "${SERIAL}" > ${hostname_file}
+			fi
 		fi
-	fi
 
-	kernel_hostname=$(cat ${kernel_hostname_file})
-	if [ "${kernel_hostname}" != "${SERIAL}" ]
-	then
-		${ECHO} "${SERIAL}" > ${kernel_hostname_file}
+		kernel_hostname=$(cat ${kernel_hostname_file})
+		if [ "${kernel_hostname}" != "${SERIAL}" ]
+		then
+			${ECHO} "${SERIAL}" > ${kernel_hostname_file}
+		fi
 	fi
 }
 
@@ -138,6 +141,11 @@ early_setup
 read_args
 
 mount_and_boot() {
+	# run fsck on ROOT_RODEVICE
+	${FSCK} -p ${ROOT_RODEVICE}
+	# run fsck on ROOT_RWDEVICE
+	${FSCK} -p ${ROOT_RWDEVICE}
+
 	${MKDIR} -p ${ROOT_MOUNT} ${ROOT_ROMOUNT} ${ROOT_RWMOUNT}
 
 	# Build mount options for read only root file system.
