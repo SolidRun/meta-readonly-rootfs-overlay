@@ -142,9 +142,9 @@ read_args
 
 mount_and_boot() {
 	# run fsck on ROOT_RODEVICE
-	${FSCK} -p ${ROOT_RODEVICE}
+	${FSCK} -p ${ROOT_RODEVICE} > /dev/null 2>&1
 	# run fsck on ROOT_RWDEVICE
-	${FSCK} -p ${ROOT_RWDEVICE}
+	${FSCK} -p ${ROOT_RWDEVICE} > /dev/null 2>&1
 
 	${MKDIR} -p ${ROOT_MOUNT} ${ROOT_ROMOUNT} ${ROOT_RWMOUNT}
 
